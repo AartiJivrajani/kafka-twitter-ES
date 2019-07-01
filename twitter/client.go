@@ -3,26 +3,31 @@ package twitter
 import (
 	"context"
 	"fmt"
+	"kafka-twitter-ES/common"
 	"log"
+	"os"
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
 )
 
-const (
-	consumerKey    = "Te2MirNRTWm1oU8wk3DuKyUfq"
-	consumerSecret = "ZuMM2P88CXX1GUg3CaWwmvbt2u0ExWz0ksGFwvzdUEfIV2sX7I"
-	accessToken    = "526009322-LMa3YXrBGkoreplnakx1kEZMqSHwg3t7VJMfEen7"
-	accessSecret   = "NvlhggmDhlXEAMq0sz0MG7C9FwvyTbRj63QhkJPkvXQd4"
-
-	// stream the tweets for this keyword
-	keyWord = "bitcoin"
-)
 
 var (
+	consumerKey, consumerSecret, accessToken, accessSecret string
 	streamChan = make(chan *twitter.Tweet)
 	stream     *twitter.Stream
 )
+
+func Setup() {
+	consumerKey = os.Getenv("CONSUMER_KEY")
+	consumerSecret = os.Getenv("CONSUMER_SECRET")
+	accessToken = os.Getenv("ACCESS_TOKEN")
+	accessSecret = os.Getenv("ACCESS_SECRET")
+
+	if consumerKey == "" || consumerSecret == "" || accessSecret == "" || accessToken == "" {
+		log.Panic("Compulsory env variables missing. Please export CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_SECRET")
+	}
+}
 
 func createStreamingClient() *twitter.Client {
 	config := oauth1.NewConfig(consumerKey, consumerSecret)
@@ -80,7 +85,7 @@ func StartStreamingTweets(ctx context.Context) {
 	demux := twitter.NewSwitchDemux()
 
 	filterParams := &twitter.StreamFilterParams{
-		Track:         []string{keyWord},
+		Track:         []string{common.KeyWord},
 		StallWarnings: twitter.Bool(true),
 	}
 	stream, err = client.Streams.Filter(filterParams)

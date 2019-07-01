@@ -13,6 +13,7 @@ func main() {
 		osChan = make(chan os.Signal)
 	)
 	ctx := context.Background()
+	twitter.Setup()
 	twitter.StartStreamingTweets(ctx)
 
 	// cleanup on OS signals (Ctrl + C_
