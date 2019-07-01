@@ -11,21 +11,21 @@ import (
 	"github.com/dghubble/oauth1"
 )
 
-
 var (
 	consumerKey, consumerSecret, accessToken, accessSecret string
-	streamChan = make(chan *twitter.Tweet)
-	stream     *twitter.Stream
+	streamChan                                             = make(chan *twitter.Tweet)
+	stream                                                 *twitter.Stream
 )
 
-func Setup() {
+func Setup(ctx context.Context) {
 	consumerKey = os.Getenv("CONSUMER_KEY")
 	consumerSecret = os.Getenv("CONSUMER_SECRET")
 	accessToken = os.Getenv("ACCESS_TOKEN")
 	accessSecret = os.Getenv("ACCESS_SECRET")
 
 	if consumerKey == "" || consumerSecret == "" || accessSecret == "" || accessToken == "" {
-		log.Panic("Compulsory env variables missing. Please export CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_SECRET")
+		log.Println("Compulsory env variables missing. Please export CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_SECRET")
+		ctx.Done()
 	}
 }
 

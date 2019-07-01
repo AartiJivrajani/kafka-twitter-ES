@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"kafka-twitter-ES/kafka-streamer"
 	"kafka-twitter-ES/twitter"
 	"os"
 	"os/signal"
@@ -12,12 +13,16 @@ func main() {
 	var (
 		osChan = make(chan os.Signal)
 	)
-	ctx := context.Background()
-	twitter.Setup()
+	ctx, cancel := context.WithCancel(context.Background())
+	twitter.Setup(ctx)
 	twitter.StartStreamingTweets(ctx)
 
-	// cleanup on OS signals (Ctrl + C_
+	kafka_streamer.Setup(ctx)
+	kafka_streamer.StartConsumer(ctx)
+
+	// cleanup on OS signals (Ctrl + C)
 	signal.Notify(osChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	<-osChan
+	cancel()
 	twitter.TearDown()
 }
