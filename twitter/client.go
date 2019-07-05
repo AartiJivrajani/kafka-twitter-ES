@@ -24,7 +24,7 @@ func Setup(ctx context.Context) {
 	accessSecret = os.Getenv("ACCESS_SECRET")
 
 	if consumerKey == "" || consumerSecret == "" || accessSecret == "" || accessToken == "" {
-		log.Println("Compulsory env variables missing. Please export CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_SECRET")
+		log.Panicln("Compulsory env variables missing. Please export CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_SECRET")
 		ctx.Done()
 	}
 }

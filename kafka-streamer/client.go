@@ -13,6 +13,7 @@ import (
 var (
 	broker, groupId, topicsStr string
 	topics                     []string
+	producer                   *kafka.Producer
 )
 
 func Setup(ctx context.Context) {
@@ -27,6 +28,7 @@ func Setup(ctx context.Context) {
 	topics = strings.Split(topicsStr, ",")
 }
 
+// createConsumer creates a new kafka consumer and subscribes to the required topics
 func createConsumer() *kafka.Consumer {
 	var (
 		err error
@@ -79,8 +81,46 @@ func StartConsumer(ctx context.Context) {
 				fmt.Printf("%% Reached %v\n", e)
 			case kafka.Error:
 				// Errors should generally be considered as informational, the client will try to automatically recover
-				fmt.Fprintf(os.Stderr, "%% Error: %v\n", e)
+				log.Fatal("kafka-consumer error", e.Error())
 			}
 		}
 	}
+}
+
+func Publish(ctx context.Context, value []byte) {
+	var (
+		err     error
+		event   kafka.Event
+		message *kafka.Message
+	)
+	err = producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topics[0], Partition: kafka.PartitionAny},
+		Value:          value,
+	}, producer.Events())
+	if err != nil {
+		log.Panicln("error publishing to kafka", err.Error())
+	}
+	event = <-producer.Events()
+	message = event.(*kafka.Message)
+
+	if message.TopicPartition.Error != nil {
+		fmt.Printf("Delivery failed: %v\n", message.TopicPartition.Error)
+	} else {
+		fmt.Printf("Delivered message to topic %s [%d] at offset %v\n", *message.TopicPartition.Topic, message.TopicPartition.Partition, message.TopicPartition.Offset)
+	}
+	close(producer.Events())
+
+}
+
+func StartProducer(ctx context.Context) {
+	var (
+		err error
+	)
+	producer, err = kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers": broker,
+	})
+	if err != nil {
+		log.Panicln("error creating a new kafka producer", err.Error())
+	}
+	log.Println("kafka producer created")
 }
