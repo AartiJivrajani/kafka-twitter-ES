@@ -1,14 +1,13 @@
 package twitter
 
 import (
-	"context"
-	"fmt"
-	"kafka-twitter-ES/common"
-	"log"
-	"os"
-
-	"github.com/dghubble/go-twitter/twitter"
-	"github.com/dghubble/oauth1"
+    "context"
+    "fmt"
+    "github.com/dghubble/go-twitter/twitter"
+    "github.com/dghubble/oauth1"
+    "kafka-twitter-ES/common"
+    "kafka-twitter-ES/kafka-streamer"
+    "log"
 )
 
 var (
@@ -18,15 +17,7 @@ var (
 )
 
 func Setup(ctx context.Context) {
-	consumerKey = os.Getenv("CONSUMER_KEY")
-	consumerSecret = os.Getenv("CONSUMER_SECRET")
-	accessToken = os.Getenv("ACCESS_TOKEN")
-	accessSecret = os.Getenv("ACCESS_SECRET")
-
-	if consumerKey == "" || consumerSecret == "" || accessSecret == "" || accessToken == "" {
-		log.Panicln("Compulsory env variables missing. Please export CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_SECRET")
-		ctx.Done()
-	}
+    common.CheckConfigEnv(ctx, "twitter")
 }
 
 func createStreamingClient() *twitter.Client {
@@ -65,7 +56,7 @@ func processTweets(ctx context.Context) {
 			fmt.Println("Stopping tweet processing")
 			return
 		case tweet = <-streamChan:
-			log.Println("Tweet! ", tweet.Text)
+			kafka_streamer.Publish(ctx, []byte(tweet.Text))
 		}
 	}
 }

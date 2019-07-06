@@ -3,7 +3,9 @@ package kafka_streamer
 import (
 	"context"
 	"fmt"
+	"kafka-twitter-ES/common"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"time"
@@ -59,18 +61,8 @@ func createKafkaTopic(ctx context.Context) {
 	admin.Close()
 }
 
-func checkConfigEnv(ctx context.Context) {
-	var found bool
-	for _, config := range requiredConfig {
-		_, found = os.LookupEnv(config)
-	}
-	if !found {
-		log.Panic("Compulsory env variables missing. Please export BROKER, GROUP_ID, TOPIC")
-	}
-}
-
 func Setup(ctx context.Context) {
-	checkConfigEnv(ctx)
+	common.CheckConfigEnv(ctx, "kafka")
 
 	rFactor, _ := strconv.Atoi(os.Getenv("REPLICATION_FACTOR"))
 	partitions, _ := strconv.Atoi(os.Getenv("PARTITIONS"))
@@ -146,35 +138,52 @@ func StartConsumer(ctx context.Context) {
 
 func Publish(ctx context.Context, value []byte) {
 	var (
-		err     error
-		event   kafka.Event
-		message *kafka.Message
+		event kafka.Event
 	)
-	err = producer.Produce(&kafka.Message{
+
+	doneChan := make(chan bool)
+
+	go func() {
+		defer close(doneChan)
+		for event = range producer.Events() {
+			switch ev := event.(type) {
+			case *kafka.Message:
+				if ev.TopicPartition.Error != nil {
+					fmt.Printf("Delivery failed: %v\n", ev.TopicPartition.Error)
+				} else {
+					fmt.Printf("Delivered message to topic %s [%d] at offset %v\n", *ev.TopicPartition.Topic,
+						ev.TopicPartition.Partition, ev.TopicPartition.Offset)
+				}
+				return
+			default:
+				fmt.Printf("Ignored event: %s\n", ev)
+			}
+		}
+	}()
+	producer.ProduceChannel() <- &kafka.Message{
 		TopicPartition: kafka.TopicPartition{Topic: &config.topic, Partition: kafka.PartitionAny},
 		Key:            nil,
 		Value:          value,
-	}, producer.Events())
-	if err != nil {
-		log.Panicln("error publishing to kafka", err.Error())
 	}
-	event = <-producer.Events()
-	message = event.(*kafka.Message)
-
-	if message.TopicPartition.Error != nil {
-		fmt.Printf("Delivery failed: %v\n", message.TopicPartition.Error)
-	} else {
-		fmt.Printf("Delivered message to topic %s [%d] at offset %v\n", *message.TopicPartition.Topic, message.TopicPartition.Partition, message.TopicPartition.Offset)
-	}
-	close(producer.Events())
+	_ = <-doneChan
 }
 
 func StartProducer(ctx context.Context) {
 	var (
 		err error
 	)
+	// create an idempotent/safe producer
 	producer, err = kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": config.broker,
+		"bootstrap.servers":                     config.broker,
+		"enable.idempotence":                    true,
+		"acks":                                  "all",
+		"retries":                               strconv.Itoa(math.MaxInt16),
+		"max.in.flight.requests.per.connection": "5", // kafka 2.0 >= 1.1, so leave this as 5, else use 1
+
+		// high throughput producer
+		"compression.type":   "snappy",
+		"linger.ms":          "20",
+		"batch.num.messages": strconv.Itoa(32 * 1024), // 32kb
 	})
 	if err != nil {
 		log.Panicln("error creating a new kafka producer", err.Error())
