@@ -5,27 +5,84 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
+	"strconv"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
+type kafkaConfig struct {
+	broker            string
+	groupId           string
+	topic             string
+	replicationFactor int
+	partitions        int
+}
+
 var (
-	broker, groupId, topicsStr string
-	topics                     []string
-	producer                   *kafka.Producer
+	requiredConfig = []string{"BROKER", "GROUP_ID", "TOPIC", "REPLICATION_FACTOR", "PARTITIONS"}
+	producer       *kafka.Producer
+	config         *kafkaConfig
 )
 
-func Setup(ctx context.Context) {
-	broker = os.Getenv("BROKER")
-	groupId = os.Getenv("GROUP_ID")
-	topicsStr = os.Getenv("TOPICS")
-
-	if broker == "" || groupId == "" || topicsStr == "" {
-		log.Print("Compulsory env variables missing. Please export BROKER, GROUP_ID, TOPICS(comma seperated)")
-		ctx.Done()
+func createKafkaTopic(ctx context.Context) {
+	var (
+		admin       *kafka.AdminClient
+		err         error
+		maxDuration time.Duration
+		results     []kafka.TopicResult
+	)
+	admin, err = kafka.NewAdminClient(&kafka.ConfigMap{
+		"bootstrap.servers": config.broker,
+	})
+	if err != nil {
+		log.Panicln("Unable to create kafka admin client", err.Error())
 	}
-	topics = strings.Split(topicsStr, ",")
+	maxDuration, err = time.ParseDuration("60s")
+	if err != nil {
+		panic("ParseDuration(60s)")
+	}
+	results, err = admin.CreateTopics(
+		ctx,
+		[]kafka.TopicSpecification{{
+			Topic:             config.topic,
+			NumPartitions:     config.partitions,
+			ReplicationFactor: config.replicationFactor,
+		}},
+		kafka.SetAdminOperationTimeout(maxDuration))
+	if err != nil {
+		log.Panic("Failed to create topic", err.Error())
+	}
+	for _, result := range results {
+		fmt.Println("Topic created: ", result)
+	}
+	admin.Close()
+}
+
+func checkConfigEnv(ctx context.Context) {
+	var found bool
+	for _, config := range requiredConfig {
+		_, found = os.LookupEnv(config)
+	}
+	if !found {
+		log.Panic("Compulsory env variables missing. Please export BROKER, GROUP_ID, TOPIC")
+	}
+}
+
+func Setup(ctx context.Context) {
+	checkConfigEnv(ctx)
+
+	rFactor, _ := strconv.Atoi(os.Getenv("REPLICATION_FACTOR"))
+	partitions, _ := strconv.Atoi(os.Getenv("PARTITIONS"))
+
+	config = &kafkaConfig{
+		broker:            os.Getenv("BROKER"),
+		groupId:           os.Getenv("GROUP_ID"),
+		topic:             os.Getenv("TOPIC"),
+		replicationFactor: rFactor,
+		partitions:        partitions,
+	}
+	createKafkaTopic(ctx)
 }
 
 // createConsumer creates a new kafka consumer and subscribes to the required topics
@@ -36,8 +93,8 @@ func createConsumer() *kafka.Consumer {
 	)
 
 	c, err = kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers":               broker,
-		"group.id":                        groupId,
+		"bootstrap.servers":               config.broker,
+		"group.id":                        config.groupId,
 		"session.timeout.ms":              6000,
 		"go.events.channel.enable":        true,
 		"go.application.rebalance.enable": true,
@@ -50,7 +107,7 @@ func createConsumer() *kafka.Consumer {
 
 	log.Println("Kafka Consumer created")
 
-	err = c.SubscribeTopics(topics, nil)
+	err = c.SubscribeTopics([]string{config.topic}, nil)
 	if err != nil {
 		log.Panic("Error subscribing to the topics", err.Error())
 	}
@@ -94,7 +151,8 @@ func Publish(ctx context.Context, value []byte) {
 		message *kafka.Message
 	)
 	err = producer.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &topics[0], Partition: kafka.PartitionAny},
+		TopicPartition: kafka.TopicPartition{Topic: &config.topic, Partition: kafka.PartitionAny},
+		Key:            nil,
 		Value:          value,
 	}, producer.Events())
 	if err != nil {
@@ -109,7 +167,6 @@ func Publish(ctx context.Context, value []byte) {
 		fmt.Printf("Delivered message to topic %s [%d] at offset %v\n", *message.TopicPartition.Topic, message.TopicPartition.Partition, message.TopicPartition.Offset)
 	}
 	close(producer.Events())
-
 }
 
 func StartProducer(ctx context.Context) {
@@ -117,7 +174,7 @@ func StartProducer(ctx context.Context) {
 		err error
 	)
 	producer, err = kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": broker,
+		"bootstrap.servers": config.broker,
 	})
 	if err != nil {
 		log.Panicln("error creating a new kafka producer", err.Error())

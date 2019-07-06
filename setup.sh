@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+export CONSUMER_KEY=XXXX
+export CONSUMER_SECRET=XXXX
+export ACCESS_TOKEN=XXXX
+export ACCESS_SECRET=XXXX
+export BROKER=127.0.0.1:9092
+export TOPIC=twitter_tweets
+export GROUP_ID=my-fifth-app
+export REPLICATION_FACTOR=1
+export PARTITIONS=6
