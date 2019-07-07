@@ -55,7 +55,7 @@ func createKafkaTopic(ctx context.Context) {
 		log.Panic("Failed to create topic", err.Error())
 	}
 	for _, result := range results {
-		fmt.Println("Topic created: ", result)
+		log.Println("Topic created: ", result)
 	}
 	admin.Close()
 }
@@ -84,9 +84,10 @@ func createConsumer() *kafka.Consumer {
 	)
 
 	c, err = kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": config.broker,
-		"group.id":          config.groupId,
-		"auto.offset.reset": "earliest",
+		"bootstrap.servers":  config.broker,
+		"group.id":           config.groupId,
+		"auto.offset.reset":  "earliest",
+		"enable.auto.commit": "false",
 	})
 	if err != nil {
 		log.Panic("Error starting Kafka consumer ", err.Error())
@@ -110,12 +111,17 @@ func StartConsumer(ctx context.Context) {
 	for {
 		msg, err = consumer.ReadMessage(-1)
 		if err != nil {
-			fmt.Println("error reading kafka message", err.Error())
+			log.Println("error reading kafka message", err.Error())
 			continue
 		} else {
 			es.ESChan <- msg.Value
-			//log.Printf("received message on partition [%d]: %s\n",
-			//	msg.TopicPartition, string(msg.Value))
+			// only after the message has been added to ES, commit the offsets
+			time.Sleep(10 * time.Millisecond)
+			log.Println("Committing offsets")
+			_, err = consumer.CommitOffsets([]kafka.TopicPartition{msg.TopicPartition})
+			if err != nil {
+				log.Println("error committing offsets", err.Error())
+			}
 		}
 	}
 }
@@ -133,9 +139,9 @@ func Publish(ctx context.Context, value []byte) {
 			switch ev := event.(type) {
 			case *kafka.Message:
 				if ev.TopicPartition.Error != nil {
-					fmt.Printf("Delivery failed: %v\n", ev.TopicPartition.Error)
+					log.Printf("Delivery failed: %v\n", ev.TopicPartition.Error)
 				} else {
-					fmt.Printf("Delivered message to topic %s [%d] at offset %v\n", *ev.TopicPartition.Topic,
+					log.Printf("Delivered message to topic %s [%d] at offset %v\n", *ev.TopicPartition.Topic,
 						ev.TopicPartition.Partition, ev.TopicPartition.Offset)
 				}
 				return

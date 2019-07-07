@@ -3,13 +3,13 @@ package twitter
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"github.com/dghubble/go-twitter/twitter"
-	"github.com/dghubble/oauth1"
 	"kafka-twitter-ES/common"
 	"kafka-twitter-ES/kafka-streamer"
 	"log"
 	"os"
+
+	"github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/oauth1"
 )
 
 var (
@@ -32,7 +32,7 @@ func createStreamingClient() *twitter.Client {
 	token := oauth1.NewToken(accessToken, accessSecret)
 	httpClient := config.Client(oauth1.NoContext, token)
 	streamingClient := twitter.NewClient(httpClient)
-	fmt.Println("created streaming client")
+	log.Println("created streaming client")
 
 	// Verify Credentials
 	verifyParams := &twitter.AccountVerifyParams{
@@ -44,7 +44,7 @@ func createStreamingClient() *twitter.Client {
 	// we have used successfully allow us to log in!
 	user, _, err := streamingClient.Accounts.VerifyCredentials(verifyParams)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil
 	}
 
@@ -56,11 +56,11 @@ func processTweets(ctx context.Context) {
 	var (
 		tweet *twitter.Tweet
 	)
-	fmt.Println("Gonna start processing the tweets")
+	log.Println("Gonna start processing the tweets")
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("Stopping tweet processing")
+			log.Println("Stopping tweet processing")
 			return
 		case tweet = <-streamChan:
 			val, _ := json.Marshal(tweet)
@@ -72,7 +72,7 @@ func processTweets(ctx context.Context) {
 // StartStreamingTweets creates a streaming client and starts listening to tweets based
 // on a filter. Multiple types of filters can be set in this case
 func StartStreamingTweets(ctx context.Context) {
-	fmt.Println("starting the streaming...")
+	log.Println("starting the streaming...")
 	var (
 		err error
 
@@ -100,6 +100,6 @@ func StartStreamingTweets(ctx context.Context) {
 }
 
 func TearDown() {
-	fmt.Println("Stopping stream")
+	log.Println("Stopping stream")
 	stream.Stop()
 }
