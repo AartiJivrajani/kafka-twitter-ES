@@ -8,7 +8,7 @@ const (
   "mappings": {
     "tweet": {
       "properties": {
-        "msg": {
+        "_doc": {
           "type": "keyword"
         }
       }

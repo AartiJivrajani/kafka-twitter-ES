@@ -113,7 +113,7 @@ func StartConsumer(ctx context.Context) {
 			fmt.Println("error reading kafka message", err.Error())
 			continue
 		} else {
-			es.ESChan <- string(msg.Value)
+			es.ESChan <- msg.Value
 			//log.Printf("received message on partition [%d]: %s\n",
 			//	msg.TopicPartition, string(msg.Value))
 		}

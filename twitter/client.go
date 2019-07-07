@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
@@ -62,7 +63,8 @@ func processTweets(ctx context.Context) {
 			fmt.Println("Stopping tweet processing")
 			return
 		case tweet = <-streamChan:
-			kafka_streamer.Publish(ctx, []byte(tweet.Text))
+			val, _ := json.Marshal(tweet)
+			kafka_streamer.Publish(ctx, val)
 		}
 	}
 }

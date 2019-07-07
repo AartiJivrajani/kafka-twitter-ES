@@ -12,7 +12,7 @@ import (
 var (
 	esClient *elastic.Client
 	esConf   *esConfig
-	ESChan   = make(chan string)
+	ESChan   = make(chan []byte)
 )
 
 type esConfig struct {
@@ -21,24 +21,17 @@ type esConfig struct {
 	secret string
 }
 
-type esData struct {
-	Msg string `json:"msg"`
-}
-
-func esInsert(ctx context.Context, msg string) {
+func esInsert(ctx context.Context, msg []byte) {
 	var (
-		err    error
-		esData = &esData{
-			Msg: msg,
-		}
+		err error
 	)
-	_, err = esClient.Index().Index(common.ESIndex).Type(common.ESType).BodyJson(esData).Do(ctx)
+	_, err = esClient.Index().Index(common.ESIndex).Type(common.ESType).BodyString(string(msg)).Do(ctx)
 	if err != nil {
 		if e, OK := err.(*elastic.Error); OK {
-			log.Panicf("error posting to ES.\nDetails: %v\nDoc:%v\n", e.Details, esData)
+			log.Printf("error posting to ES.\nDetails: %v\nDoc:%v\n", e.Details, string(msg))
 			return
 		}
-		log.Panicf("error posting to ES.\nError: %v\nDoc:%v\n", err.Error(), esData)
+		log.Printf("error posting to ES.\nError: %v\nDoc:%v\n", err.Error(), string(msg))
 		return
 	}
 	log.Println("posted data to ES")
@@ -47,7 +40,7 @@ func esInsert(ctx context.Context, msg string) {
 
 func startIngestWorker(ctx context.Context) {
 	var (
-		msg string
+		msg []byte
 	)
 	for {
 		select {
