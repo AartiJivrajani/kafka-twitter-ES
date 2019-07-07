@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"kafka-twitter-ES/common"
+	"kafka-twitter-ES/es"
 	"log"
 	"os"
 	"strconv"
@@ -112,8 +113,9 @@ func StartConsumer(ctx context.Context) {
 			fmt.Println("error reading kafka message", err.Error())
 			continue
 		} else {
-			log.Printf("received message on partition [%d]: %s\n",
-				msg.TopicPartition, string(msg.Value))
+			es.ESChan <- string(msg.Value)
+			//log.Printf("received message on partition [%d]: %s\n",
+			//	msg.TopicPartition, string(msg.Value))
 		}
 	}
 }
