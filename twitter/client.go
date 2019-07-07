@@ -1,13 +1,14 @@
 package twitter
 
 import (
-    "context"
-    "fmt"
-    "github.com/dghubble/go-twitter/twitter"
-    "github.com/dghubble/oauth1"
-    "kafka-twitter-ES/common"
-    "kafka-twitter-ES/kafka-streamer"
-    "log"
+	"context"
+	"fmt"
+	"github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/oauth1"
+	"kafka-twitter-ES/common"
+	"kafka-twitter-ES/kafka-streamer"
+	"log"
+	"os"
 )
 
 var (
@@ -17,7 +18,12 @@ var (
 )
 
 func Setup(ctx context.Context) {
-    common.CheckConfigEnv(ctx, "twitter")
+	common.CheckConfigEnv(ctx, "twitter")
+
+	consumerKey = os.Getenv("TWITTER_CONSUMER_KEY")
+	consumerSecret = os.Getenv("TWITTER_CONSUMER_SECRET")
+	accessToken = os.Getenv("TWITTER_ACCESS_TOKEN")
+	accessSecret = os.Getenv("TWITTER_ACCESS_SECRET")
 }
 
 func createStreamingClient() *twitter.Client {

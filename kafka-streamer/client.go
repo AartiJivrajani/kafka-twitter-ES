@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"kafka-twitter-ES/common"
 	"log"
-	"math"
 	"os"
 	"strconv"
 	"time"
@@ -22,9 +21,8 @@ type kafkaConfig struct {
 }
 
 var (
-	requiredConfig = []string{"BROKER", "GROUP_ID", "TOPIC", "REPLICATION_FACTOR", "PARTITIONS"}
-	producer       *kafka.Producer
-	config         *kafkaConfig
+	producer *kafka.Producer
+	config   *kafkaConfig
 )
 
 func createKafkaTopic(ctx context.Context) {
@@ -85,53 +83,37 @@ func createConsumer() *kafka.Consumer {
 	)
 
 	c, err = kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers":               config.broker,
-		"group.id":                        config.groupId,
-		"session.timeout.ms":              6000,
-		"go.events.channel.enable":        true,
-		"go.application.rebalance.enable": true,
-		"enable.partition.eof":            true,
-		"auto.offset.reset":               "earliest",
+		"bootstrap.servers": config.broker,
+		"group.id":          config.groupId,
+		"auto.offset.reset": "earliest",
 	})
 	if err != nil {
 		log.Panic("Error starting Kafka consumer ", err.Error())
 	}
-
-	log.Println("Kafka Consumer created")
-
-	err = c.SubscribeTopics([]string{config.topic}, nil)
+	fmt.Println()
+	err = c.Subscribe(config.topic, nil)
 	if err != nil {
 		log.Panic("Error subscribing to the topics", err.Error())
 	}
+	log.Println("Kafka Consumer created")
 	return c
 }
 
 func StartConsumer(ctx context.Context) {
 	var (
 		consumer *kafka.Consumer
+		msg      *kafka.Message
 		err      error
 	)
 	consumer = createConsumer()
 	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println("Received QUIT, stopping kafka consumers")
-			err = consumer.Close()
-			if err != nil {
-				log.Println("Error closing the kafka conusmer")
-			}
-			return
-		case ev := <-consumer.Events():
-			switch e := ev.(type) {
-			case *kafka.Message:
-				fmt.Printf("%% Message on %s:\n%s\n",
-					e.TopicPartition, string(e.Value))
-			case kafka.PartitionEOF:
-				fmt.Printf("%% Reached %v\n", e)
-			case kafka.Error:
-				// Errors should generally be considered as informational, the client will try to automatically recover
-				log.Fatal("kafka-consumer error", e.Error())
-			}
+		msg, err = consumer.ReadMessage(-1)
+		if err != nil {
+			fmt.Println("error reading kafka message", err.Error())
+			continue
+		} else {
+			log.Printf("received message on partition [%d]: %s\n",
+				msg.TopicPartition, string(msg.Value))
 		}
 	}
 }
@@ -174,11 +156,10 @@ func StartProducer(ctx context.Context) {
 	)
 	// create an idempotent/safe producer
 	producer, err = kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers":                     config.broker,
-		"enable.idempotence":                    true,
-		"acks":                                  "all",
-		"retries":                               strconv.Itoa(math.MaxInt16),
-		"max.in.flight.requests.per.connection": "5", // kafka 2.0 >= 1.1, so leave this as 5, else use 1
+		"bootstrap.servers":  config.broker,
+		"group.id":           config.groupId,
+		"enable.idempotence": true,
+		"acks":               "-1",
 
 		// high throughput producer
 		"compression.type":   "snappy",

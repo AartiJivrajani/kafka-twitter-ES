@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"kafka-twitter-ES/es"
 	"kafka-twitter-ES/kafka-streamer"
 	"kafka-twitter-ES/twitter"
 	"os"
@@ -16,6 +17,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	twitter.Setup(ctx)
 	twitter.StartStreamingTweets(ctx)
+
+	// setup ES
+	es.Setup(ctx)
 
 	kafka_streamer.Setup(ctx)
 	// start the kafka producer
