@@ -15,3 +15,6 @@ ES cluster on AWS and gives me access to an ES sandbox.
 
 
 [Bonsai]: http://www.bonsai.io
+
+# Some notes on Kafka 
+https://github.com/AartiJivrajani/kafka-twitter-ES/tree/master/kafka-streamer
